@@ -3,168 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Universal Translator</title>
+    <title>AI Live Translator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
-        .tab { cursor: pointer; padding: 0.75rem 1.5rem; border-bottom: 3px solid transparent; transition: all 0.2s; color: #6b7280; }
-        .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; font-weight: 600; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
         .translator-container { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; }
         .text-panel { background-color: white; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         .text-area { width: 100%; height: 100%; resize: none; border: none; outline: none; background: transparent; }
         .icon-btn { background: none; border: none; cursor: pointer; color: #6b7280; transition: color 0.2s; }
         .icon-btn:hover { color: #4f46e5; }
-        .file-drop-zone { border: 2px dashed #cbd5e1; border-radius: 0.75rem; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s; }
-        .file-drop-zone.dragover { background-color: #e0e7ff; border-color: #4f46e5; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s; z-index: 50; }
-        .modal-overlay.visible { opacity: 1; visibility: visible; }
-        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; transform: scale(0.95); transition: transform 0.3s; }
-        .modal-overlay.visible .modal-content { transform: scale(1); }
-        .preview-container { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .preview-pane { max-height: 75vh; overflow-y: auto; }
+        /* NEW: Style for a disabled speaker button */
+        .icon-btn:disabled { color: #d1d5db; cursor: not-allowed; }
     </style>
 </head>
-<body class="p-4">
+<body class="p-4 flex items-center justify-center min-h-screen">
     <div class="w-full max-w-4xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-800">Universal Translator</h1>
-            <p class="text-gray-600 mt-1">Translate text and documents with a live preview.</p>
+            <h1 class="text-4xl font-bold text-gray-800">Live Translator</h1>
+            <p class="text-gray-600 mt-1">Translate text instantly between dozens of languages.</p>
         </header>
-        <div class="flex justify-center border-b mb-6">
-            <button id="text-tab" class="tab active" onclick="switchTab('text')">Text</button>
-            <button id="doc-tab" class="tab" onclick="switchTab('doc')">Documents</button>
-        </div>
         <div>
-            <div id="text-tab-content" class="tab-content active">
-                 <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
-                    <div class="flex items-center justify-around">
-                        <select id="source-lang" class="bg-gray-50 border-gray-300 text-sm rounded-lg block w-1/3 p-2.5">
-                            <option value="auto" selected>Auto-Detect</option>
-                            {% for code, name in languages.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
-                        </select>
-                        <button id="swap-btn" class="p-2 rounded-full hover:bg-gray-100">
-                             <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                        </button>
-                        <select id="target-lang-text" class="bg-gray-50 border-gray-300 text-sm rounded-lg block w-1/3 p-2.5">
-                            {% for code, name in languages.items() %}<option value="{{ code }}" {% if code == 'es' %}selected{% endif %}>{{ name }}</option>{% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <main class="translator-container">
-                    <div class="text-panel flex flex-col h-72">
-                        <textarea id="source-text" class="text-area" placeholder="Enter text..."></textarea>
-                        <div class="flex justify-end items-center border-t pt-2 mt-2">
-                            <span id="source-char-count" class="text-xs text-gray-500">0 / 5000</span>
-                        </div>
-                    </div>
-                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                    <div class="text-panel flex flex-col h-72">
-                         <div class="w-full h-full text-lg relative">
-                             <div id="loader-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-                             <textarea id="target-text" class="text-area" readonly placeholder="Translation..."></textarea>
-                         </div>
-                        <div class="flex justify-end items-center border-t pt-2 mt-2 space-x-2">
-                             <button id="speaker-btn" class="icon-btn"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464A5 5 0 0118 12a5 5 0 01-2.464 3.536M6.343 12H4a2 2 0 00-2 2v3a2 2 0 002 2h2.343l5.343 5.343a2 2 0 002.828 0V6.657a2 2 0 00-2.828 0L6.343 12z"></path></svg></button>
-                             <button id="copy-btn" class="icon-btn"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
-                        </div>
-                    </div>
-                </main>
-            </div>
-            <div id="doc-tab-content" class="tab-content">
-                 <div class="bg-white p-6 rounded-xl shadow-lg">
-                    <div class="mb-4">
-                        <label for="target-lang-doc" class="block text-sm font-medium text-gray-700 mb-1">Translate To:</label>
-                        <select id="target-lang-doc" class="bg-gray-50 border-gray-300 text-sm rounded-lg w-full p-2.5">
-                            {% for code, name in languages.items() %}<option value="{{ code }}" {% if code == 'es' %}selected{% endif %}>{{ name }}</option>{% endfor %}
-                        </select>
-                    </div>
-                    <div id="drop-zone" class="file-drop-zone">
-                        <p class="text-gray-600">Drag & drop your file here</p>
-                        <p class="text-sm text-gray-500 my-2">or</p>
-                        <button id="browse-btn" type="button" class="font-semibold text-indigo-600 hover:text-indigo-500">Browse for a file</button>
-                        <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg">
-                    </div>
-                    <div id="status-container" class="mt-4 text-center"></div>
+            <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
+                <div class="flex items-center justify-around">
+                    <select id="source-lang" class="bg-gray-50 border-gray-300 text-sm rounded-lg block w-1/3 p-2.5">
+                        <option value="auto" selected>Auto-Detect</option>
+                        {% for code, name in languages.items() %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+                    </select>
+                    <button id="swap-btn" class="p-2 rounded-full hover:bg-gray-100">
+                         <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </button>
+                    <select id="target-lang-text" class="bg-gray-50 border-gray-300 text-sm rounded-lg block w-1/3 p-2.5">
+                        {% for code, name in languages.items() %}<option value="{{ code }}" {% if code == 'es' %}selected{% endif %}>{{ name }}</option>{% endfor %}
+                    </select>
                 </div>
             </div>
-        </div>
-    </div>
-    <div id="preview-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold">Translated Document</h2><button id="close-modal-btn" class="text-3xl font-light leading-none hover:text-gray-800">&times;</button></div>
-            <div id="preview-container" class="preview-container">
-                <div id="preview-image-pane" class="preview-pane border-r pr-4">
-                    <h3 class="font-bold text-lg mb-2">Original</h3>
-                    <div id="preview-wrapper"></div>
+            <main class="translator-container">
+                <div class="text-panel flex flex-col h-72">
+                    <textarea id="source-text" class="text-area" placeholder="Enter text..."></textarea>
+                    <div class="flex justify-end items-center border-t pt-2 mt-2">
+                        <span id="source-char-count" class="text-xs text-gray-500">0 / 5000</span>
+                    </div>
                 </div>
-                <div id="preview-text-pane" class="preview-pane">
-                     <h3 class="font-bold text-lg mb-2">Translation</h3>
-                     <div id="preview-text"></div>
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                <div class="text-panel flex flex-col h-72">
+                     <div class="w-full h-full text-lg relative">
+                         <div id="loader-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                         <textarea id="target-text" class="text-area" readonly placeholder="Translation..."></textarea>
+                     </div>
+                    <div class="flex justify-end items-center border-t pt-2 mt-2 space-x-2">
+                         <button id="speaker-btn" class="icon-btn"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464A5 5 0 0118 12a5 5 0 01-2.464 3.536M6.343 12H4a2 2 0 00-2 2v3a2 2 0 002 2h2.343l5.343 5.343a2 2 0 002.828 0V6.657a2 2 0 00-2.828 0L6.343 12z"></path></svg></button>
+                         <button id="copy-btn" class="icon-btn"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 <script>
-    function switchTab(tabName) { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.getElementById(`${tabName}-tab`).classList.add('active'); document.getElementById(`${tabName}-tab-content`).classList.add('active'); }
     const sourceText = document.getElementById('source-text'), targetText = document.getElementById('target-text'), sourceLang = document.getElementById('source-lang'), targetLangText = document.getElementById('target-lang-text'), sourceCharCount = document.getElementById('source-char-count'), loaderText = document.getElementById('loader-text'), speakerBtn = document.getElementById('speaker-btn'), copyBtn = document.getElementById('copy-btn'), swapBtn = document.getElementById('swap-btn');
     let debounceTimer;
-    async function translateLiveText() { const text = sourceText.value.trim(); if (!text) { targetText.value = ''; return; } loaderText.style.display = 'block'; targetText.style.visibility = 'hidden'; try { const res = await fetch('/translate-text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text, source_language: sourceLang.value, target_language: targetLangText.value }) }); if (!res.ok) { throw new Error('Translation failed.'); } const data = await res.json(); targetText.value = data.translated_text; } catch(error) { targetText.value = 'Translation failed.'; } finally { loaderText.style.display = 'none'; targetText.style.visibility = 'visible'; } }
-    sourceText.addEventListener('input', () => { sourceCharCount.textContent = `${sourceText.value.length} / 5000`; clearTimeout(debounceTimer); debounceTimer = setTimeout(translateLiveText, 650); });
-    targetLangText.addEventListener('change', translateLiveText); sourceLang.addEventListener('change', translateLiveText);
+    let availableVoices = [];
+
+    // --- NEW: Load available voices from the browser ---
+    function populateVoices() {
+        availableVoices = speechSynthesis.getVoices();
+        checkSpeakerAvailability(); // Check initially
+    }
+    // This is needed because voices load asynchronously
+    speechSynthesis.onvoiceschanged = populateVoices;
+    populateVoices();
+
+    // --- NEW: Function to check if a voice exists for the selected language ---
+    function checkSpeakerAvailability() {
+        const selectedLangCode = targetLangText.value;
+        const voiceExists = availableVoices.some(voice => voice.lang.startsWith(selectedLangCode));
+        speakerBtn.disabled = !voiceExists;
+    }
+
+    async function translateLiveText() { 
+        const text = sourceText.value.trim(); 
+        if (!text) { targetText.value = ''; return; } 
+        loaderText.style.display = 'block'; 
+        targetText.style.visibility = 'hidden'; 
+        try { 
+            const res = await fetch('/translate-text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text, source_language: sourceLang.value, target_language: targetLangText.value }) }); 
+            if (!res.ok) { throw new Error('Translation failed.'); } 
+            const data = await res.json(); 
+            targetText.value = data.translated_text; 
+            checkSpeakerAvailability(); // NEW: Check speaker after translation
+        } catch(error) { 
+            targetText.value = 'Translation failed.'; 
+        } finally { 
+            loaderText.style.display = 'none'; 
+            targetText.style.visibility = 'visible'; 
+        } 
+    }
+
+    sourceText.addEventListener('input', () => { 
+        sourceCharCount.textContent = `${sourceText.value.length} / 5000`; 
+        clearTimeout(debounceTimer); 
+        debounceTimer = setTimeout(translateLiveText, 650); 
+    });
+    
+    targetLangText.addEventListener('change', () => {
+        translateLiveText(); // Translate first
+        checkSpeakerAvailability(); // Then check speaker
+    });
+
+    sourceLang.addEventListener('change', translateLiveText);
     swapBtn.addEventListener('click', () => { if (sourceLang.value === 'auto') return; [sourceLang.value, targetLangText.value] = [targetLangText.value, sourceLang.value]; [sourceText.value, targetText.value] = [targetText.value, sourceText.value]; sourceText.dispatchEvent(new Event('input')); });
     copyBtn.addEventListener('click', () => navigator.clipboard.writeText(targetText.value));
     speakerBtn.addEventListener('click', () => { if (targetText.value && 'speechSynthesis' in window) { const utterance = new SpeechSynthesisUtterance(targetText.value); utterance.lang = targetLangText.value; speechSynthesis.speak(utterance); } });
-    
-    const dropZone = document.getElementById('drop-zone'), browseBtn = document.getElementById('browse-btn'), fileInput = document.getElementById('file-input'), targetLangDoc = document.getElementById('target-lang-doc'), statusContainer = document.getElementById('status-container'), modal = document.getElementById('preview-modal'), previewWrapper = document.getElementById('preview-wrapper'), previewTextPane = document.getElementById('preview-text-pane'), previewText = document.getElementById('preview-text'), closeModalBtn = document.getElementById('close-modal-btn');
-    let currentObjectUrl = null;
-    browseBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eName => dropZone.addEventListener(eName, e => {e.preventDefault(); e.stopPropagation();}, false));
-    ['dragenter', 'dragover'].forEach(eName => dropZone.addEventListener(eName, () => dropZone.classList.add('dragover')));
-    ['dragleave', 'drop'].forEach(eName => dropZone.addEventListener(eName, () => dropZone.classList.remove('dragover')));
-    dropZone.addEventListener('drop', (e) => handleFile(e.dataTransfer.files[0]));
-    closeModalBtn.addEventListener('click', () => modal.classList.remove('visible'));
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('visible'); });
-
-    async function handleFile(file) {
-        if (!file) return;
-        statusContainer.innerHTML = `<div class="flex items-center justify-center text-gray-700"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 mr-3"></div>Translating ${file.name}...</div>`;
-        if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-        currentObjectUrl = URL.createObjectURL(file);
-        if (file.type.startsWith("image/")) {
-            previewWrapper.innerHTML = `<img src="${currentObjectUrl}" class="w-full rounded-md shadow-md"/>`;
-        } else if (file.type === "application/pdf") {
-            previewWrapper.innerHTML = `<embed src="${currentObjectUrl}" type="application/pdf" class="w-full h-[75vh] rounded-md shadow-md"/>`;
-        } else {
-            previewWrapper.innerHTML = `<p class="text-gray-500">No preview available</p>`;
-        }
-        modal.classList.add("visible");
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("language", targetLangDoc.value);
-        try {
-            const res = await fetch("/translate-file", { method: "POST", body: formData });
-            const data = await res.json();
-            statusContainer.innerHTML = "";
-            if (!res.ok) throw new Error(data.error || "Failed to process file.");
-            if (data.file_type === "docx") {
-                document.getElementById("preview-image-pane").style.display = "none";
-                previewTextPane.style.gridColumn = "span 2";
-                previewText.innerHTML = data.html_content;
-            } else {
-                document.getElementById("preview-image-pane").style.display = "block";
-                previewTextPane.style.gridColumn = "auto";
-                previewText.innerHTML = `<p style="white-space: pre-wrap;">${data.translated_text}</p>`;
-            }
-        } catch (error) {
-            statusContainer.innerHTML = `<p class="text-red-600">Error: ${error.message}</p>`;
-        } finally {
-            fileInput.value = "";
-        }
-    }
 </script>
 </body>
 </html>
+
